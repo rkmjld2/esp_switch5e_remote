@@ -1,0 +1,12 @@
+RewriteEngine On
+
+# ============================================================
+# ESP-SWITCH5 REMOTE
+# FRIENDLY CUSTOMER CONTROLLER URL
+# ============================================================
+
+# /c/ESP0001
+# becomes:
+# index.php?controller_id=ESP0001
+
+RewriteRule ^c/([A-Za-z0-9_-]+)$ index.php?controller_id=$1 [L,QSA]
