@@ -1,5 +1,6 @@
-```php
+
 <?php
+
 /*
 ============================================================
  ESP-SWITCH5 REMOTE
@@ -29,19 +30,33 @@ Fields:
     start_time
     end_time
 
-IMPORTANT:
-    This page is OWNER ONLY.
-
 Authentication:
-    TOKEN_PASSWORD environment variable
+    TOKEN_PASSWORD from .env
 
-Example .env:
+Example:
     TOKEN_PASSWORD=EspSwitch5Owner@2026
 
 Timezone:
     Asia/Kolkata
+
+IMPORTANT:
+    This page is OWNER ONLY.
 ============================================================
 */
+
+
+/* =========================================================
+   START SESSION FIRST
+   IMPORTANT: NOTHING MUST BE OUTPUT BEFORE THIS
+========================================================= */
+
+ob_start();
+
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+
+date_default_timezone_set("Asia/Kolkata");
 
 
 /* =========================================================
@@ -56,17 +71,6 @@ require_once __DIR__ . "/config.php";
 ========================================================= */
 
 require_once __DIR__ . "/db.php";
-
-
-/* =========================================================
-   SESSION
-========================================================= */
-
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-
-date_default_timezone_set("Asia/Kolkata");
 
 
 /* =========================================================
@@ -107,7 +111,7 @@ if (isset($_GET["logout"])) {
 
 
 /* =========================================================
-   LOGIN
+   OWNER LOGIN
 ========================================================= */
 
 $login_error = "";
@@ -134,7 +138,7 @@ if (isset($_POST["owner_login"])) {
 
 
 /* =========================================================
-   OWNER LOGIN PAGE
+   LOGIN PAGE
 ========================================================= */
 
 if (
@@ -163,115 +167,70 @@ if (
 }
 
 body {
-
     margin: 0;
     padding: 20px;
-
-    font-family:
-        Arial,
-        Helvetica,
-        sans-serif;
-
+    font-family: Arial, Helvetica, sans-serif;
     background: #f2f2f2;
 }
 
 .login-box {
-
     max-width: 450px;
-
     margin: 80px auto;
-
     background: white;
-
     padding: 30px;
-
     border-radius: 12px;
-
-    box-shadow:
-        0 3px 15px
-        rgba(0,0,0,0.15);
-
+    box-shadow: 0 3px 15px rgba(0,0,0,0.15);
     text-align: center;
 }
 
 h1 {
-
     margin-top: 0;
-
     color: #333;
 }
 
 .warning {
-
     background: #fff3cd;
-
     color: #856404;
-
     border: 1px solid #ffeeba;
-
     padding: 12px;
-
     border-radius: 6px;
-
     margin-bottom: 20px;
-
     font-size: 14px;
 }
 
 input {
-
     width: 100%;
-
     padding: 12px;
-
     font-size: 16px;
-
     border: 1px solid #aaa;
-
     border-radius: 6px;
-
     margin: 15px 0;
 }
 
 button {
-
     width: 100%;
-
     padding: 12px;
-
     border: none;
-
     border-radius: 6px;
-
     background: #343a40;
-
     color: white;
-
     font-size: 16px;
-
     cursor: pointer;
 }
 
 button:hover {
-
     opacity: 0.85;
 }
 
 .error {
-
     color: #dc3545;
-
     margin-bottom: 10px;
-
     font-weight: bold;
 }
 
 .small {
-
     margin-top: 15px;
-
     color: #777;
-
     font-size: 13px;
 }
 
@@ -298,8 +257,7 @@ Do not give this page or its password to customers.
 
 if ($login_error !== "") {
 
-    echo
-        '<div class="error">' .
+    echo '<div class="error">' .
         htmlspecialchars(
             $login_error,
             ENT_QUOTES,
@@ -330,9 +288,7 @@ OWNER LOGIN
 </form>
 
 <div class="small">
-
 ESP-SWITCH5 Controller Management
-
 </div>
 
 </div>
@@ -359,8 +315,7 @@ $edit_controller = null;
 
 
 /* =========================================================
-   HELPER
-   CONVERT DATETIME FOR HTML datetime-local
+   DATETIME HELPER
 ========================================================= */
 
 function datetime_for_input($value)
@@ -373,15 +328,18 @@ function datetime_for_input($value)
         return "";
     }
 
-    return date(
-        "Y-m-d\TH:i",
-        strtotime($value)
-    );
+    $timestamp = strtotime($value);
+
+    if ($timestamp === false) {
+        return "";
+    }
+
+    return date("Y-m-d\TH:i", $timestamp);
 }
 
 
 /* =========================================================
-   ADD CONTROLLER
+   ADD NEW CONTROLLER
 ========================================================= */
 
 if (isset($_POST["add_controller"])) {
@@ -408,10 +366,6 @@ if (isset($_POST["add_controller"])) {
         trim($_POST["end_time"] ?? "");
 
 
-    /* -----------------------------------------------------
-       VALIDATION
-    ----------------------------------------------------- */
-
     if ($controller_id === "") {
 
         $message = "Controller ID is required.";
@@ -435,7 +389,7 @@ if (isset($_POST["add_controller"])) {
     } else {
 
         /* -------------------------------------------------
-           CHECK DUPLICATES
+           CHECK DUPLICATE CONTROLLER ID / DEVICE TOKEN
         ------------------------------------------------- */
 
         $check = $conn->prepare("
@@ -448,7 +402,9 @@ if (isset($_POST["add_controller"])) {
 
         if (!$check) {
 
-            $message = "Database query preparation failed.";
+            $message =
+                "Database query preparation failed.";
+
             $message_type = "error";
 
         } else {
@@ -465,7 +421,8 @@ if (isset($_POST["add_controller"])) {
 
             if ($result->num_rows > 0) {
 
-                $existing = $result->fetch_assoc();
+                $existing =
+                    $result->fetch_assoc();
 
                 if (
                     $existing["controller_id"] ===
@@ -491,7 +448,7 @@ if (isset($_POST["add_controller"])) {
 
 
                 /* -----------------------------------------
-                   CONVERT DATETIME
+                   DATETIME CONVERSION
                 ----------------------------------------- */
 
                 $start_db =
@@ -512,7 +469,7 @@ if (isset($_POST["add_controller"])) {
 
 
                 /* -----------------------------------------
-                   INSERT
+                   INSERT NEW CONTROLLER
                 ----------------------------------------- */
 
                 $stmt = $conn->prepare("
@@ -583,11 +540,15 @@ if (isset($_POST["add_controller"])) {
 if (isset($_POST["delete_controller"])) {
 
     $controller_id =
-        trim($_POST["delete_controller_id"] ?? "");
+        trim(
+            $_POST["delete_controller_id"] ?? ""
+        );
 
     if ($controller_id === "") {
 
-        $message = "Invalid Controller ID.";
+        $message =
+            "Invalid Controller ID.";
+
         $message_type = "error";
 
     } else {
@@ -652,7 +613,9 @@ if (isset($_POST["delete_controller"])) {
 if (isset($_POST["toggle_active"])) {
 
     $controller_id =
-        trim($_POST["toggle_controller_id"] ?? "");
+        trim(
+            $_POST["toggle_controller_id"] ?? ""
+        );
 
     $new_active =
         isset($_POST["new_active"])
@@ -661,7 +624,9 @@ if (isset($_POST["toggle_active"])) {
 
     if ($controller_id === "") {
 
-        $message = "Invalid Controller ID.";
+        $message =
+            "Invalid Controller ID.";
+
         $message_type = "error";
 
     } else {
@@ -718,28 +683,42 @@ if (isset($_POST["toggle_active"])) {
 if (isset($_POST["save_edit"])) {
 
     $original_controller_id =
-        trim($_POST["original_controller_id"] ?? "");
+        trim(
+            $_POST["original_controller_id"] ?? ""
+        );
 
     $controller_id =
-        trim($_POST["controller_id"] ?? "");
+        trim(
+            $_POST["controller_id"] ?? ""
+        );
 
     $customer_token =
-        trim($_POST["customer_token"] ?? "");
+        trim(
+            $_POST["customer_token"] ?? ""
+        );
 
     $device_token =
-        trim($_POST["device_token"] ?? "");
+        trim(
+            $_POST["device_token"] ?? ""
+        );
 
     $customer_name =
-        trim($_POST["customer_name"] ?? "");
+        trim(
+            $_POST["customer_name"] ?? ""
+        );
 
     $active =
         isset($_POST["active"]) ? 1 : 0;
 
     $start_time =
-        trim($_POST["start_time"] ?? "");
+        trim(
+            $_POST["start_time"] ?? ""
+        );
 
     $end_time =
-        trim($_POST["end_time"] ?? "");
+        trim(
+            $_POST["end_time"] ?? ""
+        );
 
 
     if ($original_controller_id === "") {
@@ -756,6 +735,13 @@ if (isset($_POST["save_edit"])) {
 
         $message_type = "error";
 
+    } elseif (strlen($controller_id) > 50) {
+
+        $message =
+            "Controller ID cannot exceed 50 characters.";
+
+        $message_type = "error";
+
     } elseif ($device_token === "") {
 
         $message =
@@ -763,10 +749,17 @@ if (isset($_POST["save_edit"])) {
 
         $message_type = "error";
 
+    } elseif (strlen($device_token) > 100) {
+
+        $message =
+            "Device Token cannot exceed 100 characters.";
+
+        $message_type = "error";
+
     } else {
 
         /* -------------------------------------------------
-           CHECK DUPLICATES AGAINST OTHER RECORDS
+           CHECK DUPLICATES
         ------------------------------------------------- */
 
         $check = $conn->prepare("
@@ -800,7 +793,8 @@ if (isset($_POST["save_edit"])) {
 
             if ($result->num_rows > 0) {
 
-                $existing = $result->fetch_assoc();
+                $existing =
+                    $result->fetch_assoc();
 
                 if (
                     $existing["controller_id"] ===
@@ -843,7 +837,7 @@ if (isset($_POST["save_edit"])) {
 
 
                 /* -----------------------------------------
-                   UPDATE
+                   UPDATE CONTROLLER
                 ----------------------------------------- */
 
                 $stmt = $conn->prepare("
@@ -908,7 +902,7 @@ if (isset($_POST["save_edit"])) {
 
 
 /* =========================================================
-   LOAD RECORD FOR EDIT
+   LOAD CONTROLLER FOR EDIT
 ========================================================= */
 
 if (isset($_GET["edit"])) {
@@ -1010,379 +1004,250 @@ ESP-SWITCH5 - Owner Controller Management
 }
 
 body {
-
     margin: 0;
-
     padding: 20px;
-
-    font-family:
-        Arial,
-        Helvetica,
-        sans-serif;
-
+    font-family: Arial, Helvetica, sans-serif;
     background: #f2f2f2;
-
     color: #222;
 }
 
 .container {
-
-    max-width: 1200px;
-
+    max-width: 1250px;
     margin: 30px auto;
-
     background: white;
-
     padding: 25px;
-
     border-radius: 12px;
-
-    box-shadow:
-        0 3px 15px
-        rgba(0,0,0,0.15);
+    box-shadow: 0 3px 15px rgba(0,0,0,0.15);
 }
 
 .header {
-
     text-align: center;
-
     margin-bottom: 20px;
 }
 
 .header h1 {
-
     margin: 0;
-
     color: #333;
 }
 
 .subtitle {
-
     color: #666;
-
     margin-top: 6px;
 }
 
 .owner-warning {
-
     background: #fff3cd;
-
     border: 1px solid #ffeeba;
-
     color: #856404;
-
     padding: 12px;
-
     border-radius: 6px;
-
     margin-bottom: 20px;
-
     text-align: center;
-
     font-weight: bold;
 }
 
 .message {
-
     padding: 12px;
-
     border-radius: 6px;
-
     margin-bottom: 20px;
-
     text-align: center;
-
     font-weight: bold;
 }
 
 .success {
-
     background: #d4edda;
-
     color: #155724;
 }
 
 .error {
-
     background: #f8d7da;
-
     color: #721c24;
 }
 
 .section {
-
     margin-top: 25px;
-
     margin-bottom: 25px;
 }
 
 .section-title {
-
     background: #343a40;
-
     color: white;
-
     padding: 12px;
-
     border-radius: 7px;
-
     margin-bottom: 15px;
-
     font-size: 18px;
-
     font-weight: bold;
 }
 
 .form-box {
-
     background: #f8f9fa;
-
     border: 1px solid #ddd;
-
     border-radius: 10px;
-
     padding: 20px;
 }
 
 .grid {
-
     display: grid;
-
-    grid-template-columns:
-        repeat(2, 1fr);
-
+    grid-template-columns: repeat(2, 1fr);
     gap: 15px;
 }
 
 .field {
-
     width: 100%;
 }
 
 .field-full {
-
     grid-column: 1 / -1;
 }
 
 label {
-
     display: block;
-
     font-weight: bold;
-
     margin-bottom: 7px;
 }
 
 input[type="text"],
 input[type="datetime-local"] {
-
     width: 100%;
-
     padding: 11px;
-
     font-size: 15px;
-
     border: 1px solid #aaa;
-
     border-radius: 6px;
 }
 
 .checkbox {
-
     display: flex;
-
     align-items: center;
-
     gap: 8px;
-
-    margin-top: 25px;
+    margin-top: 10px;
 }
 
 .checkbox input {
-
     width: 20px;
-
     height: 20px;
 }
 
 .button-row {
-
     display: flex;
-
     gap: 10px;
-
     margin-top: 20px;
-
     flex-wrap: wrap;
 }
 
 button,
 .button-link {
-
     padding: 11px 18px;
-
     border: none;
-
     border-radius: 6px;
-
     color: white;
-
-    font-size: 15px;
-
+    font-size: 14px;
     cursor: pointer;
-
     text-decoration: none;
-
     display: inline-block;
-
     text-align: center;
 }
 
 .add-button {
-
     background: #198754;
 }
 
 .update-button {
-
     background: #0d6efd;
 }
 
 .cancel-button {
-
     background: #6c757d;
 }
 
 .delete-button {
-
     background: #dc3545;
 }
 
 .activate-button {
-
     background: #198754;
 }
 
 .deactivate-button {
-
     background: #fd7e14;
 }
 
 .logout {
-
     background: #343a40;
-
     margin-top: 20px;
 }
 
 button:hover,
 .button-link:hover {
-
     opacity: 0.85;
 }
 
 .table-wrapper {
-
     overflow-x: auto;
 }
 
 table {
-
     width: 100%;
-
     border-collapse: collapse;
-
-    min-width: 1050px;
+    min-width: 1150px;
 }
 
 th,
 td {
-
     border: 1px solid #ddd;
-
     padding: 9px;
-
     text-align: left;
-
     vertical-align: middle;
 }
 
 th {
-
     background: #343a40;
-
     color: white;
-
     white-space: nowrap;
 }
 
 tr:nth-child(even) {
-
     background: #f8f9fa;
 }
 
 .status-active {
-
     color: #198754;
-
     font-weight: bold;
 }
 
 .status-inactive {
-
     color: #dc3545;
-
     font-weight: bold;
 }
 
 .actions {
-
     white-space: nowrap;
 }
 
 .actions form {
-
     display: inline;
 }
 
-.small-text {
-
-    font-size: 12px;
-
-    color: #666;
-}
-
 .note {
-
     margin-top: 20px;
-
     padding: 15px;
-
     background: #eef6ff;
-
     border: 1px solid #b8d8f5;
-
     border-radius: 8px;
-
     font-size: 14px;
-
     line-height: 1.5;
 }
 
 @media (max-width: 700px) {
 
     .grid {
-
         grid-template-columns: 1fr;
     }
 
     .field-full {
-
         grid-column: auto;
     }
 
     .container {
-
         padding: 15px;
     }
 }
@@ -1446,23 +1311,23 @@ echo htmlspecialchars(
 
 
 <?php
-/* =========================================================
-   ADD / EDIT FORM
-========================================================= */
 
 $is_edit =
     ($edit_controller !== null);
 
 ?>
 
+
 <div class="section">
 
 <div class="section-title">
 
 <?php
+
 echo $is_edit
     ? "EDIT CONTROLLER"
     : "ADD NEW CONTROLLER";
+
 ?>
 
 </div>
@@ -1495,6 +1360,7 @@ if ($is_edit) {
 }
 
 ?>
+
 
 <div class="grid">
 
@@ -1738,19 +1604,10 @@ ADD CONTROLLER
 </div>
 
 
-<?php
-/* =========================================================
-   CONTROLLER LIST
-========================================================= */
-
-?>
-
 <div class="section">
 
 <div class="section-title">
-
 ALL CONTROLLERS
-
 </div>
 
 
@@ -1763,23 +1620,14 @@ ALL CONTROLLERS
 <tr>
 
 <th>ID</th>
-
 <th>Controller ID</th>
-
 <th>Customer Name</th>
-
 <th>Customer Token</th>
-
 <th>Device Token</th>
-
 <th>Active</th>
-
 <th>Last Seen</th>
-
 <th>Start Time</th>
-
 <th>End Time</th>
-
 <th>Actions</th>
 
 </tr>
@@ -1797,10 +1645,8 @@ if (count($controllers) === 0) {
 
 <tr>
 
-<td
-    colspan="10"
-    style="text-align:center;"
->
+<td colspan="10"
+    style="text-align:center;">
 
 No controllers found.
 
@@ -1929,20 +1775,13 @@ INACTIVE
 
 <?php
 
-if (
-    !empty($controller["last_seen"])
-) {
-
-    echo htmlspecialchars(
+echo !empty($controller["last_seen"])
+    ? htmlspecialchars(
         $controller["last_seen"],
         ENT_QUOTES,
         "UTF-8"
-    );
-
-} else {
-
-    echo "-";
-}
+    )
+    : "-";
 
 ?>
 
@@ -1953,18 +1792,13 @@ if (
 
 <?php
 
-if (!empty($controller["start_time"])) {
-
-    echo htmlspecialchars(
+echo !empty($controller["start_time"])
+    ? htmlspecialchars(
         $controller["start_time"],
         ENT_QUOTES,
         "UTF-8"
-    );
-
-} else {
-
-    echo "-";
-}
+    )
+    : "-";
 
 ?>
 
@@ -1975,18 +1809,13 @@ if (!empty($controller["start_time"])) {
 
 <?php
 
-if (!empty($controller["end_time"])) {
-
-    echo htmlspecialchars(
+echo !empty($controller["end_time"])
+    ? htmlspecialchars(
         $controller["end_time"],
         ENT_QUOTES,
         "UTF-8"
-    );
-
-} else {
-
-    echo "-";
-}
+    )
+    : "-";
 
 ?>
 
@@ -2012,13 +1841,7 @@ EDIT
     method="post"
     onsubmit="
         return confirm(
-            'WARNING: Delete controller <?php
-            echo htmlspecialchars(
-                $controller["controller_id"],
-                ENT_QUOTES,
-                "UTF-8"
-            );
-            ?> permanently?'
+            'WARNING: Delete this controller permanently?'
         );
     "
 >
@@ -2118,18 +1941,19 @@ echo (int)$controller["active"] === 1
 
 <strong>Important:</strong><br><br>
 
-1. <strong>Controller ID</strong> must be unique.<br>
+• Controller ID must be unique.<br>
 
-2. <strong>Device Token</strong> must also be unique.<br>
+• Device Token must be unique.<br>
 
-3. <strong>last_seen</strong> is displayed here but is not manually changed. It should continue to be updated by the ESP/API.<br>
+• last_seen is displayed but is not manually changed.<br>
 
-4. <strong>Active</strong> controls whether the controller is enabled or disabled.<br>
+• last_seen should continue to be updated by the ESP/API.<br>
 
-5. Changing the <strong>Device Token</strong> means the ESP firmware must contain the same new token.<br>
+• Active controls whether the controller is enabled or disabled.<br>
 
-6. Deleting a controller permanently removes its row from the
-<strong>controllers</strong> table.
+• Changing Device Token requires the ESP firmware to use the same token.<br>
+
+• DELETE permanently removes the controller row from the database.
 
 </div>
 
@@ -2151,4 +1975,10 @@ OWNER LOGOUT
 </body>
 
 </html>
-```
+
+<?php
+
+ob_end_flush();
+
+?>
+
