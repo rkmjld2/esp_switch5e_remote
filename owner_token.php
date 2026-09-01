@@ -2388,7 +2388,3 @@ when it communicates with the server.
 
 </html>
 ::
-
-This is the complete replacement. **Do not add `<?php` before the first line, and do not put ```php inside the file.** The very first characters of the file must be `<?php`; this is important because the earlier problem was caused by output occurring before the session/header operations.
-
-One additional important point: **DELETE deletes only the row from `controllers`**, exactly as you requested. It does not automatically delete the corresponding `esp_control` row.
