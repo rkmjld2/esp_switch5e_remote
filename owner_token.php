@@ -677,78 +677,77 @@ if (isset($_POST["update_controller"])) {
     }
 
     else {
+$stmt =
+    $conn->prepare("
+        UPDATE controllers
+        SET
+            controller_id = ?,
+            customer_token = ?,
+            device_token = ?,
+            customer_name = ?,
+            active = ?
+        WHERE controller_id = ?
+    ");
 
-        $stmt =
-            $conn->prepare("
-                UPDATE controllers
-                SET
-                    controller_id = ?,
-                    customer_token = ?,
-                    device_token = ?,
-                    customer_name = ?,
-                    active = ?
-                WHERE controller_id = ?
-            ");
+if (!$stmt) {
 
+    $message =
+        "Controller update preparation failed.";
 
-        if (!$stmt) {
+    $message_type =
+        "error";
+
+} else {
+
+    $stmt->bind_param(
+        "ssssis",
+        $controller_id,
+        $customer_token,
+        $device_token,
+        $customer_name,
+        $active,
+        $original_controller_id
+    );
+
+    try {
+
+        if ($stmt->execute()) {
 
             $message =
-                "Controller update preparation failed.";
+                "Controller " .
+                $controller_id .
+                " updated successfully.";
 
             $message_type =
-                "error";
+                "success";
+
+            $edit_controller = null;
+
+        }
+
+    }
+    catch (mysqli_sql_exception $e) {
+
+        if (
+            $e->getCode() == 1062
+        ) {
+
+            $message =
+                "Controller ID or Device Token already exists.";
 
         } else {
 
-            $stmt->bind_param(
-                "ssss is",
-                $controller_id,
-                $customer_token,
-                $device_token,
-                $customer_name,
-                $active,
-                $original_controller_id
-            );
-
-            try {
-
-                if ($stmt->execute()) {
-
-                    $message =
-                        "Controller " .
-                        $controller_id .
-                        " updated successfully.";
-
-                    $message_type =
-                        "success";
-
-                    $edit_controller = null;
-
-                }
-
-            }
-            catch (mysqli_sql_exception $e) {
-
-                if (
-                    $e->getCode() == 1062
-                ) {
-
-                    $message =
-                        "Controller ID or Device Token already exists.";
-
-                } else {
-
-                    $message =
-                        "Could not update controller.";
-                }
-
-                $message_type =
-                    "error";
-            }
-
-            $stmt->close();
+            $message =
+                "Could not update controller.";
         }
+
+        $message_type =
+            "error";
+    }
+
+    $stmt->close();
+}
+       
     }
 }
 
