@@ -1602,14 +1602,14 @@ if ($message !== "") {
     class="message
     <?php
 
-```
+
 echo
     $message_type === "success"
         ? "success"
         : "error";
 
 ?>"
-```
+
 
 >
 
