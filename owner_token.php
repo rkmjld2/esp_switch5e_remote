@@ -10,7 +10,11 @@ File:
     owner_token.php
 
 Purpose:
-    Change device_token of a controller.
+    Change the device_token of a controller.
+
+IMPORTANT:
+    This page is OWNER ONLY.
+    Customers must NOT receive this page or its password.
 
 Authentication:
     TOKEN_PASSWORD environment variable
@@ -24,15 +28,35 @@ Table:
 Timezone:
     Asia/Kolkata
 
-IMPORTANT:
-    This file intentionally DOES NOT use PHP sessions.
-    Owner authentication is handled with a secure cookie.
+============================================================
+*/
+
+/*
+============================================================
+ VERY IMPORTANT
+============================================================
+
+This file MUST begin with <?php as the FIRST characters.
+
+Do NOT put:
+    spaces
+    blank lines
+    HTML
+    ```php
+    UTF-8 BOM
+
+before <?php
+
 ============================================================
 */
 
 
 /* =========================================================
-   OUTPUT BUFFERING
+   OUTPUT BUFFER
+=========================================================
+
+This protects session_start() and header() from accidental
+output caused by included files such as config.php or db.php.
 ========================================================= */
 
 ob_start();
@@ -60,55 +84,21 @@ date_default_timezone_set("Asia/Kolkata");
 
 
 /* =========================================================
-   OWNER AUTHENTICATION
+   SESSION
 ========================================================= */
 
-/*
-   We use a signed authentication cookie instead of
-   PHP sessions.
-
-   This avoids all session_start() / header problems.
-*/
-
-$owner_authenticated = false;
-
-$owner_cookie = $_COOKIE["esp_owner_auth"] ?? "";
-
-$token_password_value =
-    isset($token_password)
-        ? (string)$token_password
-        : "";
-
-
-/*
-   Create the expected authentication value.
-
-   The cookie contains only a hash, not the actual password.
-*/
-
-if (
-    $token_password_value !== ""
-) {
-
-    $expected_owner_cookie =
-        hash(
-            "sha256",
-            $token_password_value .
-            "|ESP-SWITCH5-OWNER-AUTH"
-        );
-
-
-    if (
-        $owner_cookie !== "" &&
-        hash_equals(
-            $expected_owner_cookie,
-            $owner_cookie
-        )
-    ) {
-
-        $owner_authenticated = true;
-    }
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
 }
+
+
+/* =========================================================
+   VARIABLES
+========================================================= */
+
+$login_error = "";
+$message = "";
+$message_type = "";
 
 
 /* =========================================================
@@ -117,25 +107,26 @@ if (
 
 if (isset($_GET["logout"])) {
 
-    setcookie(
-        "esp_owner_auth",
-        "",
-        [
-            "expires"  => time() - 3600,
-            "path"     => "/",
-            "secure"   => (
-                isset($_SERVER["HTTPS"]) &&
-                $_SERVER["HTTPS"] !== "off"
-            ),
-            "httponly" => true,
-            "samesite" => "Lax"
-        ]
-    );
+    $_SESSION = [];
 
+    if (ini_get("session.use_cookies")) {
 
-    header(
-        "Location: owner_token.php"
-    );
+        $params = session_get_cookie_params();
+
+        setcookie(
+            session_name(),
+            "",
+            time() - 42000,
+            $params["path"],
+            $params["domain"],
+            $params["secure"],
+            $params["httponly"]
+        );
+    }
+
+    session_destroy();
+
+    header("Location: owner_token.php");
 
     exit;
 }
@@ -145,58 +136,24 @@ if (isset($_GET["logout"])) {
    OWNER LOGIN
 ========================================================= */
 
-$login_error = "";
-
-
-if (
-    isset($_POST["owner_login"])
-) {
+if (isset($_POST["owner_login"])) {
 
     $password =
         $_POST["owner_password"] ?? "";
 
 
     if (
-        $token_password_value !== "" &&
+        isset($token_password) &&
+        $token_password !== "" &&
         hash_equals(
-            $token_password_value,
+            $token_password,
             $password
         )
     ) {
 
-        /*
-           Correct owner password.
+        $_SESSION["esp_owner"] = true;
 
-           Create signed authentication cookie.
-        */
-
-        $auth_value =
-            hash(
-                "sha256",
-                $token_password_value .
-                "|ESP-SWITCH5-OWNER-AUTH"
-            );
-
-
-        setcookie(
-            "esp_owner_auth",
-            $auth_value,
-            [
-                "expires"  => time() + 86400,
-                "path"     => "/",
-                "secure"   => (
-                    isset($_SERVER["HTTPS"]) &&
-                    $_SERVER["HTTPS"] !== "off"
-                ),
-                "httponly" => true,
-                "samesite" => "Lax"
-            ]
-        );
-
-
-        header(
-            "Location: owner_token.php"
-        );
+        header("Location: owner_token.php");
 
         exit;
 
@@ -212,7 +169,10 @@ if (
    OWNER LOGIN PAGE
 ========================================================= */
 
-if (!$owner_authenticated) {
+if (
+    !isset($_SESSION["esp_owner"]) ||
+    $_SESSION["esp_owner"] !== true
+) {
 
 ?>
 
@@ -227,9 +187,7 @@ if (!$owner_authenticated) {
 <meta name="viewport"
       content="width=device-width, initial-scale=1.0">
 
-<title>
-ESP-SWITCH5 - Owner Login
-</title>
+<title>ESP-SWITCH5 - Owner Login</title>
 
 <style>
 
@@ -379,11 +337,9 @@ OWNER ACCESS
 <div class="warning">
 
 This page is for owner use only.<br>
-
 Do not give this page or its password to customers.
 
 </div>
-
 
 <?php
 
@@ -400,7 +356,6 @@ if ($login_error !== "") {
 }
 
 ?>
-
 
 <form method="post">
 
@@ -420,7 +375,6 @@ OWNER LOGIN
 </button>
 
 </form>
-
 
 <div class="small">
 
@@ -443,27 +397,15 @@ ESP-SWITCH5 Device Token Management
 
 
 /* =========================================================
-   VARIABLES
-========================================================= */
-
-$message = "";
-
-$message_type = "";
-
-
-/* =========================================================
    CHANGE DEVICE TOKEN
 ========================================================= */
 
-if (
-    isset($_POST["change_token"])
-) {
+if (isset($_POST["change_token"])) {
 
     $controller_id =
         trim(
             $_POST["controller_id"] ?? ""
         );
-
 
     $new_token =
         trim(
@@ -475,9 +417,7 @@ if (
        VALIDATE CONTROLLER ID
     ----------------------------------------------------- */
 
-    if (
-        $controller_id === ""
-    ) {
+    if ($controller_id === "") {
 
         $message =
             "Controller ID is required.";
@@ -491,9 +431,7 @@ if (
        VALIDATE TOKEN
     ----------------------------------------------------- */
 
-    elseif (
-        $new_token === ""
-    ) {
+    elseif ($new_token === "") {
 
         $message =
             "New Device Token is required.";
@@ -551,9 +489,7 @@ if (
             );
 
 
-            if (
-                !$stmt->execute()
-            ) {
+            if (!$stmt->execute()) {
 
                 $message =
                     "Controller verification failed.";
@@ -569,9 +505,7 @@ if (
                     $stmt->get_result();
 
 
-                if (
-                    $result->num_rows === 0
-                ) {
+                if ($result->num_rows === 0) {
 
                     $message =
                         "Controller not found.";
@@ -615,9 +549,7 @@ if (
                         );
 
 
-                        if (
-                            $update->execute()
-                        ) {
+                        if ($update->execute()) {
 
                             $message =
                                 "Device Token changed successfully " .
@@ -653,7 +585,6 @@ if (
 
 $controllers = [];
 
-
 $result =
     $conn->query("
         SELECT
@@ -678,7 +609,6 @@ if ($result) {
 }
 
 ?>
-
 
 <!DOCTYPE html>
 
@@ -906,7 +836,6 @@ input[type="text"] {
 
 <div class="container">
 
-
 <div class="header">
 
 <h1>
@@ -936,12 +865,10 @@ if ($message !== "") {
 <div
     class="message
     <?php
-
-    echo
-        $message_type === "success"
-            ? "success"
-            : "error";
-
+        echo
+            $message_type === "success"
+                ? "success"
+                : "error";
     ?>"
 >
 
@@ -968,11 +895,9 @@ echo htmlspecialchars(
 
 <form method="post">
 
-
 <label for="controller_id">
 Select Controller
 </label>
-
 
 <select
     name="controller_id"
@@ -983,7 +908,6 @@ Select Controller
 <option value="">
 -- Select Controller --
 </option>
-
 
 <?php
 
@@ -996,13 +920,11 @@ foreach (
 
 <option
     value="<?php
-
         echo htmlspecialchars(
             $controller["controller_id"],
             ENT_QUOTES,
             "UTF-8"
         );
-
     ?>"
 >
 
@@ -1044,11 +966,8 @@ if (
 
 
 <label for="new_token">
-
 Enter New Device Token
-
 </label>
-
 
 <input
     type="text"
@@ -1074,7 +993,6 @@ Enter New Device Token
 CHANGE DEVICE TOKEN
 </button>
 
-
 </form>
 
 </div>
@@ -1084,8 +1002,8 @@ CHANGE DEVICE TOKEN
 
 <strong>Important:</strong><br><br>
 
-The new Device Token is written directly into
-<strong>controllers.device_token</strong>.
+The new Device Token is written directly into the
+<strong>controllers.device_token</strong> field.
 
 The ESP8266 must be programmed with exactly the same
 new token.
@@ -1118,7 +1036,6 @@ the old token.
 Owner Logout
 </a>
 
-
 </div>
 
 </body>
@@ -1126,6 +1043,12 @@ Owner Logout
 </html>
 
 <?php
+
+/*
+============================================================
+ END OUTPUT BUFFER
+============================================================
+*/
 
 ob_end_flush();
 
