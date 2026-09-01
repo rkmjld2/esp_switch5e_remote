@@ -1654,7 +1654,7 @@ type="hidden"
 name="original_controller_id"
 value="<?php
 
-```
+
 echo htmlspecialchars(
     $edit_controller["controller_id"],
     ENT_QUOTES,
@@ -1662,7 +1662,7 @@ echo htmlspecialchars(
 );
 
 ?>"
-```
+
 
 >
 
