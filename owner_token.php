@@ -2,10 +2,12 @@
 <?php
 /*
 ============================================================
- ESP-SWITCH5 REMOTE - owner_token.php
+ ESP-SWITCH5 REMOTE
+ OWNER-ONLY DEVICE TOKEN MANAGEMENT
 ============================================================
 
-OWNER-ONLY DEVICE TOKEN MANAGEMENT
+File:
+    owner_token.php
 
 Purpose:
     Change the device_token of a controller.
@@ -23,45 +25,50 @@ Timezone:
     Asia/Kolkata
 
 IMPORTANT:
-    No output must occur before session_start().
+    This page is OWNER ONLY.
 ============================================================
 */
 
 
 /* =========================================================
-   OUTPUT BUFFERING
-   ---------------------------------------------------------
-   Protects against accidental whitespace/output from
-   included PHP files.
+   START OUTPUT BUFFERING
 ========================================================= */
 
-<?php
 ob_start();
-
-if (headers_sent($file, $line)) {
-    die(
-        "ERROR: Headers already sent by " .
-        htmlspecialchars($file) .
-        " on line " .
-        (int)$line
-    );
-}
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-require_once __DIR__ . "/config.php";
-require_once __DIR__ . "/db.php";
-
-date_default_timezone_set("Asia/Kolkata");
-
-echo "SESSION TEST OK";
-exit;
 
 
 /* =========================================================
-   BASIC VARIABLES
+   START SESSION
+========================================================= */
+
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+
+
+/* =========================================================
+   CONFIGURATION
+========================================================= */
+
+require_once __DIR__ . "/config.php";
+
+
+/* =========================================================
+   DATABASE
+========================================================= */
+
+require_once __DIR__ . "/db.php";
+
+
+/* =========================================================
+   TIMEZONE
+========================================================= */
+
+date_default_timezone_set("Asia/Kolkata");
+
+
+/* =========================================================
+   VARIABLES
 ========================================================= */
 
 $login_error = "";
@@ -121,10 +128,6 @@ if (isset($_POST["owner_login"])) {
         )
     ) {
 
-        /*
-           Regenerate session ID after successful login.
-        */
-
         session_regenerate_id(true);
 
         $_SESSION["esp_owner"] = true;
@@ -142,7 +145,7 @@ if (isset($_POST["owner_login"])) {
 
 
 /* =========================================================
-   OWNER AUTHENTICATION CHECK
+   OWNER LOGIN PAGE
 ========================================================= */
 
 if (
@@ -150,11 +153,7 @@ if (
     $_SESSION["esp_owner"] !== true
 ) {
 
-    /*
-       LOGIN PAGE
-    */
-
-    ?>
+?>
 
 <!DOCTYPE html>
 
@@ -376,7 +375,8 @@ ESP-SWITCH5 Device Token Management
 
 <?php
 
-    exit;
+exit;
+
 }
 
 
@@ -595,6 +595,7 @@ if ($result) {
 }
 
 ?>
+
 
 <!DOCTYPE html>
 
@@ -1043,12 +1044,5 @@ Owner Logout
 
 <?php
 
-/*
-   Flush buffered output only after all headers and
-   PHP processing are complete.
-*/
-
 ob_end_flush();
-
-?>
 
