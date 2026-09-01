@@ -1677,7 +1677,7 @@ name="controller_id"
 maxlength="50"
 value="<?php
 
-```
+
 echo htmlspecialchars(
     $edit_controller["controller_id"],
     ENT_QUOTES,
@@ -1686,7 +1686,7 @@ echo htmlspecialchars(
 
 ?>"
 required
-```
+
 
 >
 
@@ -1701,7 +1701,7 @@ name="customer_token"
 maxlength="100"
 value="<?php
 
-```
+
 echo htmlspecialchars(
     $edit_controller["customer_token"] ?? "",
     ENT_QUOTES,
@@ -1710,7 +1710,7 @@ echo htmlspecialchars(
 
 ?>"
 autocomplete="off"
-```
+
 
 >
 
@@ -1725,7 +1725,7 @@ name="device_token"
 maxlength="100"
 value="<?php
 
-```
+
 echo htmlspecialchars(
     $edit_controller["device_token"],
     ENT_QUOTES,
@@ -1735,7 +1735,7 @@ echo htmlspecialchars(
 ?>"
 autocomplete="off"
 required
-```
+
 
 >
 
@@ -1750,7 +1750,7 @@ name="customer_name"
 maxlength="100"
 value="<?php
 
-```
+
 echo htmlspecialchars(
     $edit_controller["customer_name"] ?? "",
     ENT_QUOTES,
@@ -1758,7 +1758,7 @@ echo htmlspecialchars(
 );
 
 ?>"
-```
+
 
 >
 
@@ -1776,14 +1776,14 @@ name="active"
     value="1"
     <?php
 
-```
+
 echo
     ((int)$edit_controller["active"] === 1)
         ? "selected"
         : "";
 
 ?>
-```
+
 
 >
 
@@ -1795,14 +1795,14 @@ ACTIVE
     value="0"
     <?php
 
-```
+
 echo
     ((int)$edit_controller["active"] === 0)
         ? "selected"
         : "";
 
 ?>
-```
+
 
 >
 
