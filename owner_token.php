@@ -2,24 +2,16 @@
 <?php
 /*
 ============================================================
- ESP-SWITCH5 REMOTE
- OWNER-ONLY DEVICE TOKEN MANAGEMENT
+ ESP-SWITCH5 REMOTE - owner_token.php
 ============================================================
+
+OWNER-ONLY DEVICE TOKEN MANAGEMENT
 
 Purpose:
     Change the device_token of a controller.
 
-IMPORTANT:
-    This page is OWNER ONLY.
-
-    Customers must NOT receive:
-        owner_token.php
-
 Authentication:
     TOKEN_PASSWORD environment variable
-
-Database:
-    TiDB Cloud
 
 Database:
     esp_switch5
@@ -30,13 +22,26 @@ Table:
 Timezone:
     Asia/Kolkata
 
+IMPORTANT:
+    No output must occur before session_start().
 ============================================================
 */
 
 
 /* =========================================================
+   OUTPUT BUFFERING
+   ---------------------------------------------------------
+   Protects against accidental whitespace/output from
+   included PHP files.
+========================================================= */
+
+ob_start();
+
+
+/* =========================================================
    SESSION
-   MUST BE FIRST
+   ---------------------------------------------------------
+   MUST happen before config.php and db.php are included.
 ========================================================= */
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -66,6 +71,17 @@ date_default_timezone_set("Asia/Kolkata");
 
 
 /* =========================================================
+   BASIC VARIABLES
+========================================================= */
+
+$login_error = "";
+
+$message = "";
+
+$message_type = "";
+
+
+/* =========================================================
    LOGOUT
 ========================================================= */
 
@@ -73,21 +89,32 @@ if (isset($_GET["logout"])) {
 
     $_SESSION = [];
 
+    if (ini_get("session.use_cookies")) {
+
+        $params = session_get_cookie_params();
+
+        setcookie(
+            session_name(),
+            "",
+            time() - 42000,
+            $params["path"],
+            $params["domain"],
+            $params["secure"],
+            $params["httponly"]
+        );
+    }
+
     session_destroy();
 
-    header(
-        "Location: owner_token.php"
-    );
+    header("Location: owner_token.php");
 
     exit;
 }
 
 
 /* =========================================================
-   LOGIN
+   OWNER LOGIN
 ========================================================= */
-
-$login_error = "";
 
 if (isset($_POST["owner_login"])) {
 
@@ -104,11 +131,15 @@ if (isset($_POST["owner_login"])) {
         )
     ) {
 
+        /*
+           Regenerate session ID after successful login.
+        */
+
+        session_regenerate_id(true);
+
         $_SESSION["esp_owner"] = true;
 
-        header(
-            "Location: owner_token.php"
-        );
+        header("Location: owner_token.php");
 
         exit;
 
@@ -121,7 +152,7 @@ if (isset($_POST["owner_login"])) {
 
 
 /* =========================================================
-   OWNER LOGIN PAGE
+   OWNER AUTHENTICATION CHECK
 ========================================================= */
 
 if (
@@ -129,7 +160,11 @@ if (
     $_SESSION["esp_owner"] !== true
 ) {
 
-?>
+    /*
+       LOGIN PAGE
+    */
+
+    ?>
 
 <!DOCTYPE html>
 
@@ -192,6 +227,13 @@ h1 {
     color: #333;
 }
 
+h2 {
+
+    color: #555;
+
+    margin-bottom: 20px;
+}
+
 .warning {
 
     background: #fff3cd;
@@ -207,6 +249,8 @@ h1 {
     margin-bottom: 20px;
 
     font-size: 14px;
+
+    line-height: 1.5;
 }
 
 input {
@@ -290,6 +334,7 @@ Do not give this page or its password to customers.
 
 </div>
 
+
 <?php
 
 if ($login_error !== "") {
@@ -305,6 +350,7 @@ if ($login_error !== "") {
 }
 
 ?>
+
 
 <form method="post">
 
@@ -325,6 +371,7 @@ OWNER LOGIN
 
 </form>
 
+
 <div class="small">
 
 ESP-SWITCH5 Device Token Management
@@ -339,18 +386,8 @@ ESP-SWITCH5 Device Token Management
 
 <?php
 
-exit;
-
+    exit;
 }
-
-
-/* =========================================================
-   MESSAGE
-========================================================= */
-
-$message = "";
-
-$message_type = "";
 
 
 /* =========================================================
@@ -363,6 +400,7 @@ if (isset($_POST["change_token"])) {
         trim(
             $_POST["controller_id"] ?? ""
         );
+
 
     $new_token =
         trim(
@@ -478,7 +516,7 @@ if (isset($_POST["change_token"])) {
 
 
                     /* -------------------------------------
-                       UPDATE TOKEN
+                       UPDATE DEVICE TOKEN
                     ------------------------------------- */
 
                     $update =
@@ -542,6 +580,7 @@ if (isset($_POST["change_token"])) {
 
 $controllers = [];
 
+
 $result =
     $conn->query("
         SELECT
@@ -557,7 +596,7 @@ if ($result) {
 
     while (
         $row =
-            $result->fetch_assoc()
+        $result->fetch_assoc()
     ) {
 
         $controllers[] =
@@ -855,9 +894,11 @@ echo htmlspecialchars(
 
 <form method="post">
 
+
 <label for="controller_id">
 Select Controller
 </label>
+
 
 <select
     name="controller_id"
@@ -869,10 +910,12 @@ Select Controller
 -- Select Controller --
 </option>
 
+
 <?php
 
 foreach (
-    $controllers as $controller
+    $controllers
+    as $controller
 ) {
 
 ?>
@@ -915,26 +958,6 @@ if (
 
 ?>
 
-<?php
-
-if (
-    isset($controller["active"])
-) {
-
-    if (
-        (int)$controller["active"] === 1
-    ) {
-
-        echo " [ACTIVE]";
-
-    } else {
-
-        echo " [INACTIVE]";
-    }
-}
-
-?>
-
 </option>
 
 <?php
@@ -947,8 +970,11 @@ if (
 
 
 <label for="new_token">
+
 Enter New Device Token
+
 </label>
+
 
 <input
     type="text"
@@ -974,6 +1000,7 @@ Enter New Device Token
 CHANGE DEVICE TOKEN
 </button>
 
+
 </form>
 
 </div>
@@ -983,11 +1010,21 @@ CHANGE DEVICE TOKEN
 
 <strong>Important:</strong><br><br>
 
-The new Device Token is written directly into the
-<strong>controllers.device_token</strong> field.
+The new Device Token is written directly into
+<strong>controllers.device_token</strong>.
 
 The ESP8266 must be programmed with exactly the same
 new token.
+
+<br><br>
+
+Example:
+
+<br><br>
+
+<strong>
+ESP0001-TOKEN-2026-RAVI1
+</strong>
 
 <br><br>
 
@@ -1007,9 +1044,21 @@ the old token.
 Owner Logout
 </a>
 
+
 </div>
 
 </body>
 
 </html>
+
+<?php
+
+/*
+   Flush buffered output only after all headers and
+   PHP processing are complete.
+*/
+
+ob_end_flush();
+
+?>
 ```
