@@ -1,4 +1,3 @@
-```php
 <?php
 /*
 ============================================================
@@ -18,25 +17,13 @@ Functions:
     DELETE
     ACTIVATE / DEACTIVATE
 
-Fields:
-    id
-    controller_id
-    customer_token
-    device_token
-    active
-    created_at
-    updated_at
-
 IMPORTANT:
-    session_start() MUST happen before ANY HTML/output.
+    This file starts session before ANY output.
 ============================================================
 */
 
 /* =========================================================
-   START SESSION FIRST
-   This prevents:
-   "session_start(): Session cannot be started after
-    headers have already been sent"
+   START SESSION BEFORE ANY OUTPUT
 ========================================================= */
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -60,25 +47,24 @@ date_default_timezone_set("Asia/Kolkata");
    OWNER LOGIN CHECK
 ========================================================= */
 
-if (!isset($_SESSION["owner_logged_in"]) ||
-    $_SESSION["owner_logged_in"] !== true) {
-
+if (
+    !isset($_SESSION["owner_logged_in"]) ||
+    $_SESSION["owner_logged_in"] !== true
+) {
     header("Location: index.php");
     exit;
 }
 
 /* =========================================================
-   DATABASE CONNECTION
+   DATABASE CHECK
 ========================================================= */
 
-$conn = $conn ?? null;
-
-if (!$conn) {
+if (!isset($conn) || !($conn instanceof mysqli)) {
     die("Database connection failed.");
 }
 
 /* =========================================================
-   HELPER
+   HTML ESCAPE FUNCTION
 ========================================================= */
 
 function h($value)
@@ -101,13 +87,19 @@ $error = "";
    ADD CONTROLLER
 ========================================================= */
 
-if ($_SERVER["REQUEST_METHOD"] === "POST" &&
+if (
+    $_SERVER["REQUEST_METHOD"] === "POST" &&
     isset($_POST["action"]) &&
-    $_POST["action"] === "add") {
+    $_POST["action"] === "add"
+) {
+    $controller_id =
+        trim($_POST["controller_id"] ?? "");
 
-    $controller_id = trim($_POST["controller_id"] ?? "");
-    $customer_token = trim($_POST["customer_token"] ?? "");
-    $device_token = trim($_POST["device_token"] ?? "");
+    $customer_token =
+        trim($_POST["customer_token"] ?? "");
+
+    $device_token =
+        trim($_POST["device_token"] ?? "");
 
     if ($controller_id === "") {
 
@@ -123,7 +115,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
 
     } else {
 
-        /* Check duplicate controller_id */
+        /* Check duplicate Controller ID */
 
         $stmt = $conn->prepare(
             "SELECT id
@@ -134,21 +126,36 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
 
         if (!$stmt) {
 
-            $error = "Database error: " . $conn->error;
+            $error =
+                "Database error: " .
+                $conn->error;
 
         } else {
 
-            $stmt->bind_param("s", $controller_id);
+            $stmt->bind_param(
+                "s",
+                $controller_id
+            );
+
             $stmt->execute();
             $stmt->store_result();
 
             if ($stmt->num_rows > 0) {
 
-                $error = "Controller ID already exists.";
+                $error =
+                    "Controller ID already exists.";
+
+                $stmt->close();
 
             } else {
 
                 $stmt->close();
+
+                /*
+                ------------------------------------------------
+                Add controller
+                ------------------------------------------------
+                */
 
                 $stmt = $conn->prepare(
                     "INSERT INTO controllers
@@ -163,7 +170,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
 
                 if (!$stmt) {
 
-                    $error = "Database error: " . $conn->error;
+                    $error =
+                        "Database error: " .
+                        $conn->error;
 
                 } else {
 
@@ -189,10 +198,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
                     $stmt->close();
                 }
             }
-
-            if (isset($stmt) && $stmt) {
-                $stmt->close();
-            }
         }
     }
 }
@@ -201,23 +206,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
    EDIT CONTROLLER
 ========================================================= */
 
-if ($_SERVER["REQUEST_METHOD"] === "POST" &&
+if (
+    $_SERVER["REQUEST_METHOD"] === "POST" &&
     isset($_POST["action"]) &&
-    $_POST["action"] === "edit") {
+    $_POST["action"] === "edit"
+) {
+    $id =
+        intval($_POST["id"] ?? 0);
 
-    $id = intval($_POST["id"] ?? 0);
+    $controller_id =
+        trim($_POST["controller_id"] ?? "");
 
-    $controller_id = trim(
-        $_POST["controller_id"] ?? ""
-    );
+    $customer_token =
+        trim($_POST["customer_token"] ?? "");
 
-    $customer_token = trim(
-        $_POST["customer_token"] ?? ""
-    );
-
-    $device_token = trim(
-        $_POST["device_token"] ?? ""
-    );
+    $device_token =
+        trim($_POST["device_token"] ?? "");
 
     if ($id <= 0) {
 
@@ -237,7 +241,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
 
     } else {
 
-        /* Check duplicate controller ID */
+        /*
+        --------------------------------------------------------
+        Check whether another controller has same ID
+        --------------------------------------------------------
+        */
 
         $stmt = $conn->prepare(
             "SELECT id
@@ -249,7 +257,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
 
         if (!$stmt) {
 
-            $error = "Database error: " . $conn->error;
+            $error =
+                "Database error: " .
+                $conn->error;
 
         } else {
 
@@ -272,6 +282,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
             } else {
 
                 $stmt->close();
+
+                /*
+                ------------------------------------------------
+                Update controller
+                ------------------------------------------------
+                */
 
                 $stmt = $conn->prepare(
                     "UPDATE controllers
@@ -322,11 +338,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
    DELETE CONTROLLER
 ========================================================= */
 
-if ($_SERVER["REQUEST_METHOD"] === "POST" &&
+if (
+    $_SERVER["REQUEST_METHOD"] === "POST" &&
     isset($_POST["action"]) &&
-    $_POST["action"] === "delete") {
-
-    $id = intval($_POST["id"] ?? 0);
+    $_POST["action"] === "delete"
+) {
+    $id =
+        intval($_POST["id"] ?? 0);
 
     if ($id <= 0) {
 
@@ -347,7 +365,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
 
         } else {
 
-            $stmt->bind_param("i", $id);
+            $stmt->bind_param(
+                "i",
+                $id
+            );
 
             if ($stmt->execute()) {
 
@@ -370,11 +391,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
    ACTIVATE / DEACTIVATE
 ========================================================= */
 
-if ($_SERVER["REQUEST_METHOD"] === "POST" &&
+if (
+    $_SERVER["REQUEST_METHOD"] === "POST" &&
     isset($_POST["action"]) &&
-    $_POST["action"] === "toggle") {
-
-    $id = intval($_POST["id"] ?? 0);
+    $_POST["action"] === "toggle"
+) {
+    $id =
+        intval($_POST["id"] ?? 0);
 
     if ($id <= 0) {
 
@@ -384,8 +407,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
 
         $stmt = $conn->prepare(
             "UPDATE controllers
-             SET active = IF(active = 1, 0, 1),
-                 updated_at = NOW()
+             SET
+                active = IF(active = 1, 0, 1),
+                updated_at = NOW()
              WHERE id = ?"
         );
 
@@ -397,7 +421,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
 
         } else {
 
-            $stmt->bind_param("i", $id);
+            $stmt->bind_param(
+                "i",
+                $id
+            );
 
             if ($stmt->execute()) {
 
@@ -417,7 +444,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
 }
 
 /* =========================================================
-   GET ALL CONTROLLERS
+   READ CONTROLLERS
 ========================================================= */
 
 $result = $conn->query(
@@ -477,7 +504,7 @@ h1 {
 }
 
 .card {
-    background: white;
+    background: #ffffff;
     padding: 20px;
     margin-bottom: 20px;
     border-radius: 10px;
@@ -502,8 +529,7 @@ h1 {
 
 .form-row {
     display: grid;
-    grid-template-columns:
-        repeat(3, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 15px;
 }
 
@@ -591,7 +617,7 @@ th {
     flex-wrap: wrap;
 }
 
-@media(max-width: 800px) {
+@media (max-width: 800px) {
 
     .form-row {
         grid-template-columns: 1fr;
@@ -618,6 +644,7 @@ th {
 <h1>Owner Controller Management</h1>
 
 <button
+    type="button"
     class="back-btn"
     onclick="window.location.href='index.php'">
     ← Back
@@ -640,7 +667,7 @@ th {
 <?php endif; ?>
 
 <!-- =====================================================
-     ADD CONTROLLER
+     ADD NEW CONTROLLER
 ====================================================== -->
 
 <div class="card">
@@ -657,6 +684,7 @@ th {
 <div class="form-row">
 
 <div>
+
 <label>Controller ID</label>
 
 <input
@@ -664,24 +692,29 @@ th {
     name="controller_id"
     placeholder="ESP0001"
     required>
+
 </div>
 
 <div>
+
 <label>Customer Token</label>
 
 <input
     type="text"
     name="customer_token"
     required>
+
 </div>
 
 <div>
+
 <label>Device Token</label>
 
 <input
     type="text"
     name="device_token"
     required>
+
 </div>
 
 </div>
@@ -778,7 +811,9 @@ INACTIVE
 
 <!-- EDIT -->
 
-<form method="post">
+<form
+    method="post"
+    onsubmit="return editController(this);">
 
 <input
     type="hidden"
@@ -807,12 +842,7 @@ INACTIVE
 
 <button
     type="submit"
-    class="edit-btn"
-    onclick="
-        return editController(
-            this.form
-        );
-    ">
+    class="edit-btn">
     Edit
 </button>
 
@@ -837,11 +867,9 @@ INACTIVE
     class="toggle-btn">
 
 <?php
-if ((int)$row["active"] === 1) {
-    echo "Deactivate";
-} else {
-    echo "Activate";
-}
+echo ((int)$row["active"] === 1)
+    ? "Deactivate"
+    : "Activate";
 ?>
 
 </button>
@@ -909,11 +937,10 @@ No controllers found.
 
 function editController(form)
 {
-    let controllerId =
-        prompt(
-            "Controller ID:",
-            form.controller_id.value
-        );
+    let controllerId = prompt(
+        "Controller ID:",
+        form.controller_id.value
+    );
 
     if (controllerId === null) {
         return false;
@@ -926,11 +953,10 @@ function editController(form)
         return false;
     }
 
-    let customerToken =
-        prompt(
-            "Customer Token:",
-            form.customer_token.value
-        );
+    let customerToken = prompt(
+        "Customer Token:",
+        form.customer_token.value
+    );
 
     if (customerToken === null) {
         return false;
@@ -943,11 +969,10 @@ function editController(form)
         return false;
     }
 
-    let deviceToken =
-        prompt(
-            "Device Token:",
-            form.device_token.value
-        );
+    let deviceToken = prompt(
+        "Device Token:",
+        form.device_token.value
+    );
 
     if (deviceToken === null) {
         return false;
@@ -960,14 +985,9 @@ function editController(form)
         return false;
     }
 
-    form.controller_id.value =
-        controllerId;
-
-    form.customer_token.value =
-        customerToken;
-
-    form.device_token.value =
-        deviceToken;
+    form.controller_id.value = controllerId;
+    form.customer_token.value = customerToken;
+    form.device_token.value = deviceToken;
 
     return true;
 }
@@ -975,5 +995,6 @@ function editController(form)
 </script>
 
 </body>
+
 </html>
-```
+
