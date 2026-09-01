@@ -1,15 +1,15 @@
-
+```php
 <?php
 /*
 ============================================================
  ESP-SWITCH5 REMOTE
- OWNER-ONLY DEVICE TOKEN MANAGEMENT
+ OWNER-ONLY CONTROLLER MANAGEMENT
 ============================================================
 
 Purpose:
-    Change the device_token of a controller.
+    Add a new controller to the controllers table.
 
-Owner authentication:
+Authentication:
     TOKEN_PASSWORD environment variable
 
 Database:
@@ -18,20 +18,29 @@ Database:
 Table:
     controllers
 
+This page does NOT modify:
+    esp_control
+
 Timezone:
     Asia/Kolkata
-
-IMPORTANT:
-    This page is OWNER ONLY.
 ============================================================
 */
 
 
 /* =========================================================
-   OUTPUT BUFFER
+   START OUTPUT BUFFER
 ========================================================= */
 
 ob_start();
+
+
+/* =========================================================
+   SESSION
+========================================================= */
+
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
 
 
 /* =========================================================
@@ -49,12 +58,14 @@ require_once __DIR__ . "/db.php";
 
 
 /* =========================================================
-   SESSION
+   VARIABLES
 ========================================================= */
 
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
+$login_error = "";
+
+$message = "";
+
+$message_type = "";
 
 
 /* =========================================================
@@ -86,17 +97,6 @@ if (isset($_GET["logout"])) {
 
     exit;
 }
-
-
-/* =========================================================
-   VARIABLES
-========================================================= */
-
-$login_error = "";
-
-$message = "";
-
-$message_type = "";
 
 
 /* =========================================================
@@ -141,6 +141,7 @@ if (
 ) {
 
 ?>
+
 <!DOCTYPE html>
 
 <html lang="en">
@@ -152,7 +153,9 @@ if (
 <meta name="viewport"
       content="width=device-width, initial-scale=1.0">
 
-<title>ESP-SWITCH5 - Owner Login</title>
+<title>
+ESP-SWITCH5 - Owner Login
+</title>
 
 <style>
 
@@ -344,7 +347,7 @@ OWNER LOGIN
 
 <div class="small">
 
-ESP-SWITCH5 Device Token Management
+ESP-SWITCH5 Controller Management
 
 </div>
 
@@ -363,19 +366,29 @@ ESP-SWITCH5 Device Token Management
 
 
 /* =========================================================
-   CHANGE DEVICE TOKEN
+   ADD NEW CONTROLLER
 ========================================================= */
 
-if (isset($_POST["change_token"])) {
+if (isset($_POST["add_controller"])) {
 
     $controller_id =
         trim(
             $_POST["controller_id"] ?? ""
         );
 
-    $new_token =
+    $customer_name =
         trim(
-            $_POST["new_token"] ?? ""
+            $_POST["customer_name"] ?? ""
+        );
+
+    $customer_token =
+        trim(
+            $_POST["customer_token"] ?? ""
+        );
+
+    $device_token =
+        trim(
+            $_POST["device_token"] ?? ""
         );
 
 
@@ -393,14 +406,62 @@ if (isset($_POST["change_token"])) {
     }
 
 
-    /* -----------------------------------------------------
-       VALIDATE TOKEN
-    ----------------------------------------------------- */
-
-    elseif ($new_token === "") {
+    elseif (
+        !preg_match(
+            '/^[A-Za-z0-9_-]{1,50}$/',
+            $controller_id
+        )
+    ) {
 
         $message =
-            "New Device Token is required.";
+            "Invalid Controller ID. " .
+            "Use only letters, numbers, hyphen or underscore.";
+
+        $message_type =
+            "error";
+    }
+
+
+    /* -----------------------------------------------------
+       VALIDATE CUSTOMER NAME
+    ----------------------------------------------------- */
+
+    elseif (
+        strlen($customer_name) > 100
+    ) {
+
+        $message =
+            "Customer name cannot exceed 100 characters.";
+
+        $message_type =
+            "error";
+    }
+
+
+    /* -----------------------------------------------------
+       VALIDATE CUSTOMER TOKEN
+    ----------------------------------------------------- */
+
+    elseif (
+        strlen($customer_token) > 100
+    ) {
+
+        $message =
+            "Customer token cannot exceed 100 characters.";
+
+        $message_type =
+            "error";
+    }
+
+
+    /* -----------------------------------------------------
+       VALIDATE DEVICE TOKEN
+    ----------------------------------------------------- */
+
+    elseif ($device_token === "") {
+
+        $message =
+            "Device Token is required.";
 
         $message_type =
             "error";
@@ -410,7 +471,7 @@ if (isset($_POST["change_token"])) {
     elseif (
         !preg_match(
             '/^[A-Za-z0-9_-]{8,100}$/',
-            $new_token
+            $device_token
         )
     ) {
 
@@ -427,12 +488,12 @@ if (isset($_POST["change_token"])) {
     else {
 
         /* -------------------------------------------------
-           CHECK CONTROLLER
+           CHECK DUPLICATE CONTROLLER ID
         ------------------------------------------------- */
 
         $stmt =
             $conn->prepare("
-                SELECT controller_id
+                SELECT id
                 FROM controllers
                 WHERE controller_id = ?
                 LIMIT 1
@@ -442,7 +503,7 @@ if (isset($_POST["change_token"])) {
         if (!$stmt) {
 
             $message =
-                "Controller query preparation failed.";
+                "Controller verification failed.";
 
             $message_type =
                 "error";
@@ -454,11 +515,16 @@ if (isset($_POST["change_token"])) {
                 $controller_id
             );
 
+            $stmt->execute();
 
-            if (!$stmt->execute()) {
+            $result =
+                $stmt->get_result();
+
+
+            if ($result->num_rows > 0) {
 
                 $message =
-                    "Controller verification failed.";
+                    "Controller ID already exists.";
 
                 $message_type =
                     "error";
@@ -467,76 +533,145 @@ if (isset($_POST["change_token"])) {
 
             } else {
 
-                $result =
-                    $stmt->get_result();
+                $stmt->close();
 
 
-                if ($result->num_rows === 0) {
+                /* -----------------------------------------
+                   CHECK DUPLICATE DEVICE TOKEN
+                ----------------------------------------- */
+
+                $stmt =
+                    $conn->prepare("
+                        SELECT id
+                        FROM controllers
+                        WHERE device_token = ?
+                        LIMIT 1
+                    ");
+
+
+                if (!$stmt) {
 
                     $message =
-                        "Controller not found.";
+                        "Device Token verification failed.";
 
                     $message_type =
                         "error";
 
-                    $stmt->close();
-
                 } else {
 
-                    $stmt->close();
+                    $stmt->bind_param(
+                        "s",
+                        $device_token
+                    );
+
+                    $stmt->execute();
+
+                    $result =
+                        $stmt->get_result();
 
 
-                    /* -------------------------------------
-                       UPDATE DEVICE TOKEN
-                    ------------------------------------- */
-
-                    $update =
-                        $conn->prepare("
-                            UPDATE controllers
-                            SET device_token = ?
-                            WHERE controller_id = ?
-                        ");
-
-
-                    if (!$update) {
+                    if ($result->num_rows > 0) {
 
                         $message =
-                            "Token update preparation failed.";
+                            "Device Token already exists. " .
+                            "Please use a different Device Token.";
 
                         $message_type =
                             "error";
 
+                        $stmt->close();
+
                     } else {
 
-                        $update->bind_param(
-                            "ss",
-                            $new_token,
-                            $controller_id
-                        );
+                        $stmt->close();
 
 
-                        if ($update->execute()) {
+                        /* ---------------------------------
+                           INSERT CONTROLLER
+                        --------------------------------- */
+
+                        $stmt =
+                            $conn->prepare("
+                                INSERT INTO controllers
+                                (
+                                    controller_id,
+                                    customer_token,
+                                    device_token,
+                                    customer_name,
+                                    active,
+                                    last_seen,
+                                    start_time,
+                                    end_time
+                                )
+                                VALUES
+                                (
+                                    ?,
+                                    ?,
+                                    ?,
+                                    ?,
+                                    1,
+                                    NULL,
+                                    NULL,
+                                    NULL
+                                )
+                            ");
+
+
+                        if (!$stmt) {
 
                             $message =
-                                "Device Token changed successfully " .
-                                "for controller " .
-                                $controller_id .
-                                ".";
-
-                            $message_type =
-                                "success";
-
-                        } else {
-
-                            $message =
-                                "Device Token update failed.";
+                                "Controller insertion preparation failed.";
 
                             $message_type =
                                 "error";
+
+                        } else {
+
+                            $stmt->bind_param(
+                                "ssss",
+                                $controller_id,
+                                $customer_token,
+                                $device_token,
+                                $customer_name
+                            );
+
+
+                            if ($stmt->execute()) {
+
+                                $message =
+                                    "Controller " .
+                                    $controller_id .
+                                    " added successfully.";
+
+                                $message_type =
+                                    "success";
+
+
+                                /*
+                                 * Clear form values after
+                                 * successful insertion.
+                                 */
+
+                                $controller_id = "";
+
+                                $customer_name = "";
+
+                                $customer_token = "";
+
+                                $device_token = "";
+
+                            } else {
+
+                                $message =
+                                    "Controller could not be added.";
+
+                                $message_type =
+                                    "error";
+                            }
+
+
+                            $stmt->close();
                         }
-
-
-                        $update->close();
                     }
                 }
             }
@@ -557,7 +692,8 @@ $result =
         SELECT
             controller_id,
             customer_name,
-            active
+            active,
+            last_seen
         FROM controllers
         ORDER BY controller_id
     ");
@@ -589,7 +725,7 @@ if ($result) {
       content="width=device-width, initial-scale=1.0">
 
 <title>
-ESP-SWITCH5 - Owner Token Management
+ESP-SWITCH5 - Owner Controller Management
 </title>
 
 <style>
@@ -616,7 +752,7 @@ body {
 
 .container {
 
-    max-width: 700px;
+    max-width: 750px;
 
     margin: 40px auto;
 
@@ -682,6 +818,15 @@ body {
     padding: 20px;
 }
 
+.form-title {
+
+    text-align: center;
+
+    margin-top: 0;
+
+    color: #333;
+}
+
 label {
 
     display: block;
@@ -691,7 +836,6 @@ label {
     margin-bottom: 8px;
 }
 
-select,
 input[type="text"] {
 
     width: 100%;
@@ -707,7 +851,7 @@ input[type="text"] {
     margin-bottom: 18px;
 }
 
-.change-button {
+.add-button {
 
     width: 100%;
 
@@ -717,7 +861,7 @@ input[type="text"] {
 
     border-radius: 6px;
 
-    background: #dc3545;
+    background: #28a745;
 
     color: white;
 
@@ -728,7 +872,7 @@ input[type="text"] {
     cursor: pointer;
 }
 
-.change-button:hover {
+.add-button:hover {
 
     opacity: 0.85;
 }
@@ -777,6 +921,49 @@ input[type="text"] {
     line-height: 1.5;
 }
 
+.controller-list {
+
+    margin-top: 25px;
+
+    border-top: 1px solid #ddd;
+
+    padding-top: 20px;
+}
+
+.controller {
+
+    background: #fafafa;
+
+    border: 1px solid #ddd;
+
+    border-radius: 8px;
+
+    padding: 12px;
+
+    margin-bottom: 10px;
+}
+
+.controller-id {
+
+    font-weight: bold;
+
+    font-size: 17px;
+}
+
+.active {
+
+    color: #198754;
+
+    font-weight: bold;
+}
+
+.inactive {
+
+    color: #dc3545;
+
+    font-weight: bold;
+}
+
 .logout {
 
     display: block;
@@ -795,6 +982,15 @@ input[type="text"] {
     text-decoration: underline;
 }
 
+.small-note {
+
+    color: #777;
+
+    font-size: 13px;
+
+    margin-top: 5px;
+}
+
 </style>
 
 </head>
@@ -811,7 +1007,7 @@ ESP-SWITCH5
 </h1>
 
 <div class="subtitle">
-OWNER DEVICE TOKEN MANAGEMENT
+OWNER CONTROLLER MANAGEMENT
 </div>
 
 </div>
@@ -861,44 +1057,194 @@ echo htmlspecialchars(
 
 <div class="form-box">
 
+<h2 class="form-title">
+ADD NEW CONTROLLER
+</h2>
+
+
 <form method="post">
 
+
 <label for="controller_id">
-
-Select Controller
-
+Controller ID
 </label>
 
-<select
+<input
+    type="text"
     name="controller_id"
     id="controller_id"
-    required
->
-
-<option value="">
-
--- Select Controller --
-
-</option>
-
-<?php
-
-foreach (
-    $controllers
-    as $controller
-) {
-
-?>
-
-<option
+    maxlength="50"
+    placeholder="Example: ESP0002"
     value="<?php
         echo htmlspecialchars(
-            $controller["controller_id"],
+            $controller_id,
             ENT_QUOTES,
             "UTF-8"
         );
     ?>"
+    required
+    autocomplete="off"
 >
+
+
+<label for="customer_name">
+Customer Name
+</label>
+
+<input
+    type="text"
+    name="customer_name"
+    id="customer_name"
+    maxlength="100"
+    placeholder="Example: Ravi"
+    value="<?php
+        echo htmlspecialchars(
+            $customer_name,
+            ENT_QUOTES,
+            "UTF-8"
+        );
+    ?>"
+    autocomplete="off"
+>
+
+
+<label for="customer_token">
+Customer Token
+</label>
+
+<input
+    type="text"
+    name="customer_token"
+    id="customer_token"
+    maxlength="100"
+    placeholder="Enter customer token"
+    value="<?php
+        echo htmlspecialchars(
+            $customer_token,
+            ENT_QUOTES,
+            "UTF-8"
+        );
+    ?>"
+    autocomplete="off"
+>
+
+
+<label for="device_token">
+Device Token
+</label>
+
+<input
+    type="text"
+    name="device_token"
+    id="device_token"
+    maxlength="100"
+    placeholder="Example: ESP0002-TOKEN-2026-RAVI"
+    value="<?php
+        echo htmlspecialchars(
+            $device_token,
+            ENT_QUOTES,
+            "UTF-8"
+        );
+    ?>"
+    required
+    autocomplete="off"
+>
+
+
+<button
+    type="submit"
+    name="add_controller"
+    class="add-button"
+    onclick="
+        return confirm(
+            'Are you sure you want to add this controller?'
+        );
+    "
+>
+ADD CONTROLLER
+</button>
+
+
+</form>
+
+</div>
+
+
+<div class="note">
+
+<strong>What will be added:</strong>
+
+<br><br>
+
+<strong>controller_id</strong> —
+Controller ID entered above.
+
+<br>
+
+<strong>customer_token</strong> —
+Customer token entered above.
+
+<br>
+
+<strong>device_token</strong> —
+Device token entered above.
+
+<br>
+
+<strong>customer_name</strong> —
+Customer name entered above.
+
+<br>
+
+<strong>active</strong> —
+Automatically set to <strong>1</strong>.
+
+<br>
+
+<strong>last_seen</strong> —
+Initially <strong>NULL</strong>.
+
+<br>
+
+<strong>start_time</strong> —
+Initially <strong>NULL</strong>.
+
+<br>
+
+<strong>end_time</strong> —
+Initially <strong>NULL</strong>.
+
+<br><br>
+
+This page writes only to the
+<strong>controllers</strong> table.
+
+</div>
+
+
+<?php
+
+if (!empty($controllers)) {
+
+?>
+
+<div class="controller-list">
+
+<h3>
+Existing Controllers
+</h3>
+
+<?php
+
+foreach (
+    $controllers as $controller
+) {
+
+?>
+
+<div class="controller">
+
+<div class="controller-id">
 
 <?php
 
@@ -908,24 +1254,56 @@ echo htmlspecialchars(
     "UTF-8"
 );
 
-if (
-    !empty(
-        $controller["customer_name"]
-    )
-) {
+?>
 
-    echo
-        " - " .
-        htmlspecialchars(
-            $controller["customer_name"],
-            ENT_QUOTES,
-            "UTF-8"
-        );
+</div>
+
+<div>
+
+<?php
+
+if (!empty($controller["customer_name"])) {
+
+    echo htmlspecialchars(
+        $controller["customer_name"],
+        ENT_QUOTES,
+        "UTF-8"
+    );
+
+} else {
+
+    echo "No customer name";
 }
 
 ?>
 
-</option>
+</div>
+
+<div>
+
+Status:
+
+<?php
+
+if (
+    (int)$controller["active"] === 1
+) {
+
+?>
+
+<span class="active">
+ACTIVE
+</span>
+
+<?php
+
+} else {
+
+?>
+
+<span class="inactive">
+INACTIVE
+</span>
 
 <?php
 
@@ -933,76 +1311,23 @@ if (
 
 ?>
 
-</select>
-
-
-<label for="new_token">
-
-Enter New Device Token
-
-</label>
-
-<input
-    type="text"
-    name="new_token"
-    id="new_token"
-    placeholder="Example: ESP0001-TOKEN-2026-RAVI1"
-    maxlength="100"
-    required
-    autocomplete="off"
->
-
-<button
-    type="submit"
-    name="change_token"
-    class="change-button"
-    onclick="
-        return confirm(
-            'Are you sure you want to change the Device Token?'
-        );
-    "
->
-CHANGE DEVICE TOKEN
-</button>
-
-</form>
+</div>
 
 </div>
 
+<?php
 
-<div class="note">
+}
 
-<strong>Important:</strong><br><br>
-
-The new Device Token is written directly into the
-<strong>controllers.device_token</strong> field.
-
-<br><br>
-
-The ESP8266 must be programmed with exactly the same
-new token.
-
-<br><br>
-
-For example:
-
-<br><br>
-
-<strong>
-ESP0001-TOKEN-2026-RAVI1
-</strong>
-
-<br><br>
-
-If the token in the ESP8266 does not match the token
-in the database, the server will reject the ESP8266.
-
-<br><br>
-
-Changing the token therefore immediately invalidates
-the old token.
+?>
 
 </div>
+
+<?php
+
+}
+
+?>
 
 
 <a
@@ -1023,4 +1348,4 @@ Owner Logout
 
 ob_end_flush();
 ?>
-
+```
