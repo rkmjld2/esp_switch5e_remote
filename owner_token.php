@@ -1,4 +1,4 @@
-```php
+
 <?php
 /*
 ============================================================
@@ -35,39 +35,29 @@ IMPORTANT:
    included PHP files.
 ========================================================= */
 
+<?php
 ob_start();
 
+if (headers_sent($file, $line)) {
+    die(
+        "ERROR: Headers already sent by " .
+        htmlspecialchars($file) .
+        " on line " .
+        (int)$line
+    );
+}
 
-/* =========================================================
-   SESSION
-   ---------------------------------------------------------
-   MUST happen before config.php and db.php are included.
-========================================================= */
-
-if (session_status() !== PHP_SESSION_ACTIVE) {
+if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-
-/* =========================================================
-   CONFIGURATION
-========================================================= */
-
 require_once __DIR__ . "/config.php";
-
-
-/* =========================================================
-   DATABASE
-========================================================= */
-
 require_once __DIR__ . "/db.php";
 
-
-/* =========================================================
-   TIMEZONE
-========================================================= */
-
 date_default_timezone_set("Asia/Kolkata");
+
+echo "SESSION TEST OK";
+exit;
 
 
 /* =========================================================
@@ -1061,4 +1051,4 @@ Owner Logout
 ob_end_flush();
 
 ?>
-```
+
